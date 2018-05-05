@@ -6,17 +6,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/llgcode/draw2d/draw2dkit"
 	"github.com/llgcode/draw2d/draw2dimg"
+	"github.com/llgcode/draw2d/draw2dkit"
 	"image"
 	"image/color"
 
-	"github.com/golang/freetype/truetype"
-	"github.com/golang/freetype"
 	"github.com/gitu/paper/fonts"
+	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
 	"github.com/llgcode/draw2d"
 	"golang.org/x/image/bmp"
 	"math/rand"
+	"os"
 )
 
 func withLogging(next http.HandlerFunc) http.HandlerFunc {
@@ -61,7 +62,7 @@ type Schedule struct {
 	BlockInfos [4]BlockInfo
 }
 
-func serveClock(w http.ResponseWriter, r *http.Request) {
+func serveClock(w http.ResponseWriter, _ *http.Request) {
 	schedule := Schedule{
 		Blocked: rand.Float32() > 0.5,
 		Name:    "Meeting Room A",
@@ -164,5 +165,15 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 func main() {
 	http.HandleFunc("/clock", withLogging(serveClock))
 	http.HandleFunc("/", withLogging(handler))
-	log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
+
+	addr := ""
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		log.Println("$PORT should be set")
+		addr = "127.0.0.1"
+		port = "8080"
+	}
+
+	log.Fatal(http.ListenAndServe(addr+":"+port, nil))
 }
