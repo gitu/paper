@@ -148,12 +148,12 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 
 	for i := 0; i < lines; i++ {
 		cols := len(schedule.BlockInfos[i].Blocked)
-		col_width := (widthEnd - middleLine) / float64(cols)
+		colWidth := (widthEnd - middleLine) / float64(cols)
 		for j := 0; j < cols; j++ {
 			if schedule.BlockInfos[i].Blocked[j] {
 				draw2dkit.RoundedRectangle(gc,
-					middleLine+col_width*float64(j)+5, startHeight+heightLine*float64(i)+5,
-					middleLine+col_width*float64(j+1)-5, startHeight+heightLine*float64(i+1)-5,
+					middleLine+colWidth*float64(j)+5, startHeight+heightLine*float64(i)+5,
+					middleLine+colWidth*float64(j+1)-5, startHeight+heightLine*float64(i+1)-5,
 					5, 5)
 			}
 		}
