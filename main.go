@@ -95,7 +95,7 @@ func drawClock(schedule Schedule, w http.ResponseWriter) {
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	// Clock
 	gc.SetFontSize(35)
-	gc.FillStringAt(schedule.Name, 65, 70)
+	gc.FillStringAt(schedule.Name, 85, 70)
 	drawQuarters(gc, schedule)
 
 	// Save to file
@@ -107,14 +107,14 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 	lines := len(schedule.BlockInfos)
 	startHeight, heightLine := 100.0, 50.0
 	heightEnd := startHeight + heightLine*float64(lines)
-	border := 65.0
+	border := 85.0
 	widthEnd := fwidth - border
-	middleLine := 130.0
+	middleLine := 150.0
 
 	if schedule.Blocked {
 		gc.SetStrokeColor(red)
 		gc.SetFillColor(red)
-		draw2dkit.Rectangle(gc, border, heightEnd+25, widthEnd, heightEnd+50)
+		draw2dkit.Rectangle(gc, border, heightEnd+25, widthEnd+2, heightEnd+50)
 		gc.FillStroke()
 
 	}
@@ -125,15 +125,15 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 	gc.MoveTo(border, startHeight)
 	gc.LineTo(border, heightEnd)
 
-	gc.MoveTo(middleLine, startHeight)
-	gc.LineTo(middleLine, heightEnd)
+	gc.MoveTo(middleLine-2, startHeight)
+	gc.LineTo(middleLine-2, heightEnd)
 
-	gc.MoveTo(widthEnd, startHeight)
-	gc.LineTo(widthEnd, heightEnd)
+	gc.MoveTo(widthEnd+2, startHeight)
+	gc.LineTo(widthEnd+2, heightEnd)
 
 	for i := 0; i <= lines; i++ {
 		gc.MoveTo(border, startHeight+heightLine*float64(i))
-		gc.LineTo(widthEnd, startHeight+heightLine*float64(i))
+		gc.LineTo(widthEnd+2, startHeight+heightLine*float64(i))
 	}
 	gc.Stroke()
 
@@ -149,8 +149,8 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 		for j := 0; j < cols; j++ {
 			if schedule.BlockInfos[i].Blocked[j] {
 				draw2dkit.RoundedRectangle(gc,
-					middleLine+colWidth*float64(j)+5, startHeight+heightLine*float64(i)+5,
-					middleLine+colWidth*float64(j+1)-5, startHeight+heightLine*float64(i+1)-5,
+					middleLine+colWidth*float64(j)+3, startHeight+heightLine*float64(i)+3,
+					middleLine+colWidth*float64(j+1)-3, startHeight+heightLine*float64(i+1)-3,
 					5, 5)
 			}
 		}
