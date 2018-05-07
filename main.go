@@ -27,10 +27,6 @@ func withLogging(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
-}
-
 //go:generate go-bindata -pkg fonts -prefix "fonts/" -o fonts/bindata.go -ignore bindata.go fonts/
 func getFont(typ string) *truetype.Font {
 	bytes, e := fonts.Asset("Roboto-" + typ + ".ttf")
@@ -63,6 +59,7 @@ type Schedule struct {
 }
 
 func serveClock(w http.ResponseWriter, _ *http.Request) {
+	rand.Seed(int64(time.Now().Minute()))
 	schedule := Schedule{
 		Blocked: rand.Float32() > 0.5,
 		Name:    "Meeting Room A",
@@ -95,11 +92,10 @@ func drawClock(schedule Schedule, w http.ResponseWriter) {
 	gc.SetLineWidth(5)
 	gc.FontCache.Store(draw2d.FontData{Name: "roboto"}, getFont("Regular"))
 	gc.FontCache.Store(draw2d.FontData{Name: "roboto-bold"}, getFont("Bold"))
-	gc.SetFontData(draw2d.FontData{Name: "roboto"})
+	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	// Clock
-	gc.SetFontSize(30)
-	gc.FillStringAt(schedule.Name, 30, 55)
-	gc.FillStringAt(time.Now().Format("15:04"), fwidth-140, 55)
+	gc.SetFontSize(35)
+	gc.FillStringAt(schedule.Name, 65, 70)
 	drawQuarters(gc, schedule)
 
 	// Save to file
@@ -111,9 +107,9 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 	lines := len(schedule.BlockInfos)
 	startHeight, heightLine := 100.0, 50.0
 	heightEnd := startHeight + heightLine*float64(lines)
-	border := 35.0
+	border := 65.0
 	widthEnd := fwidth - border
-	middleLine := 100.0
+	middleLine := 130.0
 
 	if schedule.Blocked {
 		gc.SetStrokeColor(red)
@@ -144,7 +140,7 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	for i := 1; i <= lines; i++ {
 		gc.SetFontSize(20)
-		gc.FillStringAt(schedule.BlockInfos[i-1].Time, 50, startHeight+heightLine*float64(i)-15)
+		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+18, startHeight+heightLine*float64(i)-15)
 	}
 
 	for i := 0; i < lines; i++ {
@@ -164,7 +160,6 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 
 func main() {
 	http.HandleFunc("/clock", withLogging(serveClock))
-	http.HandleFunc("/", withLogging(handler))
 
 	addr := ""
 	port := os.Getenv("PORT")
