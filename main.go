@@ -94,8 +94,10 @@ func drawClock(schedule Schedule, w http.ResponseWriter) {
 	gc.FontCache.Store(draw2d.FontData{Name: "roboto-bold"}, getFont("Bold"))
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	// Clock
-	gc.SetFontSize(35)
+	gc.SetFontSize(30)
 	gc.FillStringAt(schedule.Name, 85, 70)
+	gc.SetFontSize(20)
+	gc.FillStringAt(time.Now().Format("02.01.2006"), 430, 60)
 	drawQuarters(gc, schedule)
 
 	// Save to file
