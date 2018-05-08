@@ -74,7 +74,7 @@ func serveClock(w http.ResponseWriter, _ *http.Request) {
 			}
 			schedule.BlockInfos[i].Blocked[j] = blocked
 		}
-		schedule.BlockInfos[i].Time = fmt.Sprintf("%2d", time.Now().Hour()+i)
+		schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Now().Hour()+i)
 	}
 
 	drawClock(schedule, w)
@@ -139,8 +139,8 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	for i := 1; i <= lines; i++ {
-		gc.SetFontSize(20)
-		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+18, startHeight+heightLine*float64(i)-15)
+		gc.SetFontSize(16)
+		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+5, startHeight+heightLine*float64(i)-17)
 	}
 
 	for i := 0; i < lines; i++ {
