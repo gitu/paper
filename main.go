@@ -49,7 +49,7 @@ var fwidth, fheight = float64(width), float64(height)
 
 type BlockInfo struct {
 	Time    string
-	Blocked [24]bool
+	Blocked [12]bool
 }
 
 type Schedule struct {
@@ -97,7 +97,7 @@ func drawClock(schedule Schedule, w http.ResponseWriter) {
 	gc.SetFontSize(30)
 	gc.FillStringAt(schedule.Name, 85, 70)
 	gc.SetFontSize(20)
-	gc.FillStringAt(time.Now().Format("02.01.2006"), 430, 60)
+	gc.FillStringAt(time.Now().Format("02.01.2006"), 425, 60)
 	drawQuarters(gc, schedule)
 
 	// Save to file
@@ -140,9 +140,19 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 	gc.Stroke()
 
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
+	gc.SetFontSize(16)
 	for i := 1; i <= lines; i++ {
-		gc.SetFontSize(16)
 		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+5, startHeight+heightLine*float64(i)-17)
+	}
+
+
+	gc.SetFontData(draw2d.FontData{Name: "roboto"})
+	gc.SetFontSize(12)
+	for i := 0; i < 4; i++ {
+		colWidth := (widthEnd - middleLine) / float64(4)
+
+		gc.FillStringAt(fmt.Sprintf(":%02d",15*i), middleLine+colWidth*float64(i), startHeight - 4)
+
 	}
 
 	for i := 0; i < lines; i++ {
@@ -151,8 +161,8 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 		for j := 0; j < cols; j++ {
 			if schedule.BlockInfos[i].Blocked[j] {
 				draw2dkit.RoundedRectangle(gc,
-					middleLine+colWidth*float64(j)+3, startHeight+heightLine*float64(i)+3,
-					middleLine+colWidth*float64(j+1)-3, startHeight+heightLine*float64(i+1)-3,
+					middleLine+colWidth*float64(j)+4, startHeight+heightLine*float64(i)+4,
+					middleLine+colWidth*float64(j+1)-4, startHeight+heightLine*float64(i+1)-4,
 					5, 5)
 			}
 		}
