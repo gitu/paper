@@ -112,8 +112,8 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 				totalBlocks := blocksPerHour * len(schedule.BlockInfos)
 
 				if event.GetStart().Before(endBlocker) && event.GetEnd().After(startBlocker) {
-					startBlock := (event.GetStart().Hour()-startBlocker.Hour())*blocksPerHour + (event.GetStart().Minute()*blocksPerHour)/60
-					endBlock := (event.GetEnd().Hour()-startBlocker.Hour())*blocksPerHour + (event.GetEnd().Minute()*blocksPerHour)/60
+					startBlock := (hours(event.GetStart())-hours(startBlocker))*blocksPerHour + (event.GetStart().Minute()*blocksPerHour)/60
+					endBlock := (hours(event.GetEnd())-hours(startBlocker))*blocksPerHour + (event.GetEnd().Minute()*blocksPerHour)/60
 
 					if startBlock < 0 {
 						startBlock = 0
@@ -134,6 +134,9 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 	}
 
 	return schedule, nil
+}
+func hours(now time.Time) int {
+	return int(time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, time.UTC).Unix() / 3600)
 }
 
 func serveClock(w http.ResponseWriter, r *http.Request) {
