@@ -114,13 +114,17 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 				startBlock := (event.GetStart().Hour()-startBlocker.Hour())*blocksPerHour + (event.GetStart().Minute()*blocksPerHour)/60
 				endBlock := (event.GetEnd().Hour()-startBlocker.Hour())*blocksPerHour + (event.GetEnd().Minute()*blocksPerHour)/60
 
-				log.Printf("%s %s  %s - %s \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
 				if startBlock < 0 {
 					startBlock = 0
 				}
 				for b := startBlock; b < totalBlocks && b < endBlock; b++ {
 					schedule.BlockInfos[b/blocksPerHour].Blocked[b%blocksPerHour] = true
 				}
+
+				if startBlock < endBlock && startBlock < totalBlocks {
+					log.Printf("%s %s  %s - %s \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
+				}
+
 			}
 
 		}
