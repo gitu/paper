@@ -3,6 +3,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/PuloV/ics-golang"
+  packages = ["."]
+  revision = "16348f88d40bf8d379179c50746e77eeb640bbaf"
+
+[[projects]]
+  branch = "master"
   name = "github.com/golang/freetype"
   packages = [
     ".",
@@ -37,6 +43,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8c5c124624f7534a4dd0d2fafa892faa604cdede13699e4a9e5eac1d9af53352"
+  inputs-digest = "9503450c7865c9d0a9b7c40328057564406899eda32f4218cd97b251480ae4b1"
   solver-name = "gps-cdcl"
   solver-version = 1

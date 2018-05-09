@@ -11,6 +11,7 @@ import (
 	"image"
 	"image/color"
 
+	"github.com/PuloV/ics-golang"
 	"github.com/gitu/paper/fonts"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
@@ -18,6 +19,8 @@ import (
 	"golang.org/x/image/bmp"
 	"math/rand"
 	"os"
+	"regexp"
+	"strings"
 )
 
 func withLogging(next http.HandlerFunc) http.HandlerFunc {
@@ -54,33 +57,132 @@ type BlockInfo struct {
 
 type Schedule struct {
 	Name       string
+	Date       string
 	Blocked    bool
 	BlockInfos [4]BlockInfo
 }
 
-func serveClock(w http.ResponseWriter, _ *http.Request) {
-	rand.Seed(int64(time.Now().Minute()))
-	schedule := Schedule{
-		Blocked: rand.Float32() > 0.5,
-		Name:    "Meeting Room A",
-	}
-	log.Println("Blocked", schedule.Blocked)
+func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Schedule, err error) {
+	schedule = &Schedule{}
 
+	parser := ics.New()
+	inputChan := parser.GetInputChan()
+	inputChan <- url
+	parser.Wait()
+
+	cal, err := parser.GetCalendars()
+	if err == nil {
+		for _, calendar := range cal {
+
+			schedule.Name = name
+
+			// print calendar info
+			log.Println(calendar.GetName(), calendar.GetDesc())
+
+			ttz, err := time.LoadLocation(timezone)
+			if err != nil {
+				return nil, err
+			}
+
+			otz, err := time.LoadLocation(overrideTimezone)
+			if err != nil {
+				otz = ttz
+			}
+
+			//  get the events for the New Years Eve
+			now := time.Now().In(ttz)
+
+			startBlocker := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, otz)
+			endBlocker := startBlocker.Add(time.Duration(len(schedule.BlockInfos)) * time.Hour).Add(time.Hour)
+
+			log.Printf("    %s %s \n", startBlocker, endBlocker)
+
+			for i := 0; i < len(schedule.BlockInfos); i++ {
+				schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i)*time.Hour).Hour())
+			}
+			schedule.Date = now.Format("02.01.2006")
+
+			for _, event := range calendar.GetEvents() {
+				if event.GetStart().Before(now) && event.GetEnd().After(now) {
+					schedule.Blocked = true
+				}
+				blocksPerHour := len(schedule.BlockInfos[0].Blocked)
+				totalBlocks := blocksPerHour * len(schedule.BlockInfos)
+
+				if event.GetStart().Before(endBlocker) && event.GetEnd().After(startBlocker) {
+					log.Printf("%d  %s %s \n", event.GetStart(), event.GetEnd())
+					startBlock := (event.GetStart().Hour()-startBlocker.Hour())*blocksPerHour + event.GetStart().Minute()*60/blocksPerHour
+					endBlock := (event.GetEnd().Hour()-startBlocker.Hour())*blocksPerHour + event.GetEnd().Minute()*60/blocksPerHour
+
+					if startBlock < 0 {
+						startBlock = 0
+					}
+					for b := startBlock; b < totalBlocks && b < endBlock; b++ {
+						schedule.BlockInfos[b/blocksPerHour].Blocked[b%blocksPerHour] = true
+					}
+				}
+			}
+
+		}
+	} else {
+		log.Println("err", err)
+		return nil, err
+	}
+
+	return schedule, nil
+}
+
+func serveClock(w http.ResponseWriter, r *http.Request) {
+	var schedule *Schedule
+	display := r.URL.Query().Get("display")
+	if display != "" {
+		sanDisplay := sanitize(display)
+		log.Println("display", display, "sanitized", sanDisplay)
+
+		name := os.Getenv("DISPLAY_" + sanDisplay + "_NAME")
+		url := os.Getenv("DISPLAY_" + sanDisplay + "_URL")
+		tz := os.Getenv("DISPLAY_" + sanDisplay + "_TZ")
+		otz := os.Getenv("DISPLAY_" + sanDisplay + "_OTZ")
+
+		if url != "" && tz != "" {
+			schedule, _ = buildSchedule(url, tz, otz, name)
+		} else {
+			log.Println("not found", sanDisplay)
+		}
+	}
+	if schedule == nil {
+		schedule = randomSchedule()
+	}
+	drawClock(schedule, w)
+}
+
+var notWhitelist = regexp.MustCompile(`[^0-9A-Z]`)
+
+func sanitize(s string) string {
+	return notWhitelist.ReplaceAllString(strings.ToUpper(s), "")
+}
+
+func randomSchedule() *Schedule {
+	rand.Seed(int64(time.Now().Minute()))
+	schedule := &Schedule{
+		Blocked: rand.Float32() > 0.5,
+		Name:    "Random Room",
+		Date:    time.Now().Format("2006-01-02"),
+	}
 	blocked := schedule.Blocked
 	for i := 0; i < len(schedule.BlockInfos); i++ {
 		for j := 0; j < len(schedule.BlockInfos[i].Blocked); j++ {
-			if rand.Float32() > 0.9 {
+			if rand.Float32() > 0.95 {
 				blocked = !blocked
 			}
 			schedule.BlockInfos[i].Blocked[j] = blocked
 		}
 		schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Now().Hour()+i)
 	}
-
-	drawClock(schedule, w)
+	return schedule
 }
 
-func drawClock(schedule Schedule, w http.ResponseWriter) {
+func drawClock(schedule *Schedule, w http.ResponseWriter) {
 	dest := image.NewRGBA(image.Rect(0, 0, width, height))
 	gc := draw2dimg.NewGraphicContext(dest)
 	draw2dkit.Rectangle(gc, 0, 0, fwidth, fheight)
@@ -97,14 +199,14 @@ func drawClock(schedule Schedule, w http.ResponseWriter) {
 	gc.SetFontSize(30)
 	gc.FillStringAt(schedule.Name, 85, 70)
 	gc.SetFontSize(20)
-	gc.FillStringAt(time.Now().Format("02.01.2006"), 425, 60)
+	gc.FillStringAt(schedule.Date, 425, 60)
 	drawQuarters(gc, schedule)
 
 	// Save to file
 	bmp.Encode(w, dest)
 }
 
-func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
+func drawQuarters(gc *draw2dimg.GraphicContext, schedule *Schedule) {
 
 	lines := len(schedule.BlockInfos)
 	startHeight, heightLine := 100.0, 50.0
@@ -145,13 +247,11 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+5, startHeight+heightLine*float64(i)-17)
 	}
 
-
 	gc.SetFontData(draw2d.FontData{Name: "roboto"})
 	gc.SetFontSize(12)
 	for i := 0; i < 4; i++ {
 		colWidth := (widthEnd - middleLine) / float64(4)
-
-		gc.FillStringAt(fmt.Sprintf(":%02d",15*i), middleLine+colWidth*float64(i), startHeight - 4)
+		gc.FillStringAt(fmt.Sprintf(":%02d", 15*i), middleLine+colWidth*float64(i), startHeight-4)
 
 	}
 
