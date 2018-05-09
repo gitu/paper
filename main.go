@@ -122,7 +122,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 				}
 
 				if startBlock < endBlock && startBlock < totalBlocks {
-					log.Printf("%s %s  %s - %s \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
+					log.Printf("%s %s  %d - %d \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
 				}
 
 			}
