@@ -254,8 +254,8 @@ func drawQuarters(gc *draw2dimg.GraphicContext, schedule *Schedule) {
 		gc.FillStringAt(schedule.BlockInfos[i-1].Time, border+5, startHeight+heightLine*float64(i)-17)
 	}
 
-	gc.SetFontData(draw2d.FontData{Name: "roboto"})
-	gc.SetFontSize(12)
+	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
+	gc.SetFontSize(13)
 	for i := 0; i < 4; i++ {
 		colWidth := (widthEnd - middleLine) / float64(4)
 		gc.FillStringAt(fmt.Sprintf(":%02d", 15*i), middleLine+colWidth*float64(i), startHeight-4)
