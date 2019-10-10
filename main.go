@@ -77,7 +77,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 			schedule.Name = name
 
 			// print calendar info
-			log.Println(calendar.GetName(), calendar.GetDesc())
+			//log.Println(calendar.GetName(), calendar.GetDesc())
 
 			ttz, err := time.LoadLocation(timezone)
 			if err != nil {
@@ -96,7 +96,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 			endBlocker := startBlocker.Add(time.Duration(len(schedule.BlockInfos)) * time.Hour).Add(time.Hour)
 			nowForBlock := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, otz)
 
-			log.Printf("    %s %s \n", startBlocker, endBlocker)
+			//log.Printf("    %s %s \n", startBlocker, endBlocker)
 
 			for i := 0; i < len(schedule.BlockInfos); i++ {
 				schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i) * time.Hour).Hour())
@@ -106,7 +106,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 			for _, event := range calendar.GetEvents() {
 				if event.GetStart().Before(nowForBlock) && event.GetEnd().After(nowForBlock) {
 					schedule.Blocked = true
-					log.Printf("blocked - %s %s \n", event.GetStart(), event.GetEnd())
+					//log.Printf("blocked - %s %s \n", event.GetStart(), event.GetEnd())
 				}
 				blocksPerHour := len(schedule.BlockInfos[0].Blocked)
 				totalBlocks := blocksPerHour * len(schedule.BlockInfos)
@@ -122,7 +122,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 						schedule.BlockInfos[b/blocksPerHour].Blocked[b%blocksPerHour] = true
 					}
 
-					log.Printf("%s %s  %d - %d \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
+					//log.Printf("%s %s  %d - %d \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
 				}
 
 			}
