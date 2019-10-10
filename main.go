@@ -99,7 +99,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 			//log.Printf("    %s %s \n", startBlocker, endBlocker)
 
 			for i := 0; i < len(schedule.BlockInfos); i++ {
-				schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i) * time.Hour).Hour())
+				schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i)*time.Hour).Hour())
 			}
 			schedule.Date = now.Format("02.01.2006")
 
@@ -144,7 +144,7 @@ func serveClock(w http.ResponseWriter, r *http.Request) {
 	display := r.URL.Query().Get("display")
 	if display != "" {
 		sanDisplay := sanitize(display)
-		log.Println("display", display, "sanitized", sanDisplay)
+		// log.Println("display", display, "sanitized", sanDisplay)
 
 		name := os.Getenv("DISPLAY_" + sanDisplay + "_NAME")
 		url := os.Getenv("DISPLAY_" + sanDisplay + "_URL")
