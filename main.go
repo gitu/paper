@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os/signal"
@@ -73,72 +74,76 @@ func init() {
 func buildSchedule(url, timezone, overrideTimezone, name string) (schedule Schedule, err error) {
 	schedule = Schedule{}
 
-	parser := ics.New()
-	inputChan := parser.GetInputChan()
-	inputChan <- url
-	parser.WaitAndClose()
-
-	cal, err := parser.GetCalendars()
-	if err == nil {
-		for _, calendar := range cal {
-
-			schedule.Name = name
-
-			// print calendar info
-			//log.Println(calendar.GetName(), calendar.GetDesc())
-
-			ttz, err := time.LoadLocation(timezone)
-			if err != nil {
-				return schedule, err
-			}
-
-			otz, err := time.LoadLocation(overrideTimezone)
-			if err != nil {
-				otz = ttz
-			}
-
-			//  get the events for the New Years Eve
-			now := time.Now().In(ttz)
-
-			startBlocker := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, otz)
-			endBlocker := startBlocker.Add(time.Duration(len(schedule.BlockInfos)) * time.Hour).Add(time.Hour)
-			nowForBlock := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, otz)
-
-			//log.Printf("    %s %s \n", startBlocker, endBlocker)
-
-			for i := 0; i < len(schedule.BlockInfos); i++ {
-				schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i)*time.Hour).Hour())
-			}
-			schedule.Date = now.Format("02.01.2006")
-
-			for _, event := range calendar.GetEvents() {
-				if event.GetStart().Before(nowForBlock) && event.GetEnd().After(nowForBlock) {
-					schedule.Blocked = true
-					//log.Printf("blocked - %s %s \n", event.GetStart(), event.GetEnd())
-				}
-				blocksPerHour := len(schedule.BlockInfos[0].Blocked)
-				totalBlocks := blocksPerHour * len(schedule.BlockInfos)
-
-				if event.GetStart().Before(endBlocker) && event.GetEnd().After(startBlocker) {
-					startBlock := (hours(event.GetStart())-hours(startBlocker))*blocksPerHour + (event.GetStart().Minute()*blocksPerHour)/60
-					endBlock := (hours(event.GetEnd())-hours(startBlocker))*blocksPerHour + (event.GetEnd().Minute()*blocksPerHour)/60
-
-					if startBlock < 0 {
-						startBlock = 0
-					}
-					for b := startBlock; b < totalBlocks && b < endBlock; b++ {
-						schedule.BlockInfos[b/blocksPerHour].Blocked[b%blocksPerHour] = true
-					}
-
-					//log.Printf("%s %s  %d - %d \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
-				}
-
-			}
-
-		}
-	} else {
+	response, err := http.Get(url)
+	if err != nil {
 		log.Println("err", err)
 		return schedule, err
+	}
+	// close the response body
+	defer response.Body.Close()
+
+	icsBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Println("err", err)
+		return schedule, err
+	}
+
+	calendar, _, err := ics.ParseICalContent(string(icsBytes), url)
+	if err != nil {
+		log.Println("err", err)
+		return schedule, err
+	}
+	schedule.Name = name
+
+	// print calendar info
+	//log.Println(calendar.GetName(), calendar.GetDesc())
+
+	ttz, err := time.LoadLocation(timezone)
+	if err != nil {
+		return schedule, err
+	}
+
+	otz, err := time.LoadLocation(overrideTimezone)
+	if err != nil {
+		otz = ttz
+	}
+
+	//  get the events for the New Years Eve
+	now := time.Now().In(ttz)
+
+	startBlocker := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, otz)
+	endBlocker := startBlocker.Add(time.Duration(len(schedule.BlockInfos)) * time.Hour).Add(time.Hour)
+	nowForBlock := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, otz)
+
+	//log.Printf("    %s %s \n", startBlocker, endBlocker)
+
+	for i := 0; i < len(schedule.BlockInfos); i++ {
+		schedule.BlockInfos[i].Time = fmt.Sprintf("%02d:00", time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, ttz).Add(time.Duration(i)*time.Hour).Hour())
+	}
+	schedule.Date = now.Format("02.01.2006")
+
+	for _, event := range calendar.GetEvents() {
+		if event.GetStart().Before(nowForBlock) && event.GetEnd().After(nowForBlock) {
+			schedule.Blocked = true
+			//log.Printf("blocked - %s %s \n", event.GetStart(), event.GetEnd())
+		}
+		blocksPerHour := len(schedule.BlockInfos[0].Blocked)
+		totalBlocks := blocksPerHour * len(schedule.BlockInfos)
+
+		if event.GetStart().Before(endBlocker) && event.GetEnd().After(startBlocker) {
+			startBlock := (hours(event.GetStart())-hours(startBlocker))*blocksPerHour + (event.GetStart().Minute()*blocksPerHour)/60
+			endBlock := (hours(event.GetEnd())-hours(startBlocker))*blocksPerHour + (event.GetEnd().Minute()*blocksPerHour)/60
+
+			if startBlock < 0 {
+				startBlock = 0
+			}
+			for b := startBlock; b < totalBlocks && b < endBlock; b++ {
+				schedule.BlockInfos[b/blocksPerHour].Blocked[b%blocksPerHour] = true
+			}
+
+			//log.Printf("%s %s  %d - %d \n", event.GetStart(), event.GetEnd(), startBlock, endBlock)
+		}
+
 	}
 
 	return schedule, nil
