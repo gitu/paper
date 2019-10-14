@@ -141,7 +141,6 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule Sched
 		return schedule, err
 	}
 
-	close(inputChan)
 	return schedule, nil
 }
 func hours(now time.Time) int {
