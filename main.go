@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os/signal"
 	"time"
 
 	"github.com/llgcode/draw2d/draw2dimg"
@@ -62,13 +65,18 @@ type Schedule struct {
 	BlockInfos [4]BlockInfo
 }
 
-func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Schedule, err error) {
-	schedule = &Schedule{}
+func init() {
+	ics.RepeatRuleApply = true
+	ics.MaxRepeats = 100
+}
+
+func buildSchedule(url, timezone, overrideTimezone, name string) (schedule Schedule, err error) {
+	schedule = Schedule{}
 
 	parser := ics.New()
 	inputChan := parser.GetInputChan()
 	inputChan <- url
-	parser.Wait()
+	parser.WaitAndClose()
 
 	cal, err := parser.GetCalendars()
 	if err == nil {
@@ -81,7 +89,7 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 
 			ttz, err := time.LoadLocation(timezone)
 			if err != nil {
-				return nil, err
+				return schedule, err
 			}
 
 			otz, err := time.LoadLocation(overrideTimezone)
@@ -130,9 +138,10 @@ func buildSchedule(url, timezone, overrideTimezone, name string) (schedule *Sche
 		}
 	} else {
 		log.Println("err", err)
-		return nil, err
+		return schedule, err
 	}
 
+	close(inputChan)
 	return schedule, nil
 }
 func hours(now time.Time) int {
@@ -140,7 +149,8 @@ func hours(now time.Time) int {
 }
 
 func serveClock(w http.ResponseWriter, r *http.Request) {
-	var schedule *Schedule
+	var schedule Schedule
+	var err error
 	display := r.URL.Query().Get("display")
 	if display != "" {
 		sanDisplay := sanitize(display)
@@ -152,16 +162,28 @@ func serveClock(w http.ResponseWriter, r *http.Request) {
 		otz := os.Getenv("DISPLAY_" + sanDisplay + "_OTZ")
 
 		if url != "" && tz != "" {
-			schedule, _ = buildSchedule(url, tz, otz, name)
+			schedule, err = buildSchedule(url, tz, otz, name)
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(500)
+				return
+			}
 		} else {
 			log.Println("not found", sanDisplay)
 		}
 	}
-	if schedule == nil {
-		schedule = randomSchedule()
+	if schedule.Name == "" {
+		schedule = randomSchedule(int64(time.Now().Minute()))
 	}
-	drawClock(schedule, w)
+	err = drawClock(schedule, w)
+
+	if err != nil {
+		log.Println(err)
+	}
 }
+
+var regular = getFont("Regular")
+var bold = getFont("Bold")
 
 var notWhitelist = regexp.MustCompile(`[^0-9A-Z]`)
 
@@ -169,9 +191,9 @@ func sanitize(s string) string {
 	return notWhitelist.ReplaceAllString(strings.ToUpper(s), "")
 }
 
-func randomSchedule() *Schedule {
-	rand.Seed(int64(time.Now().Minute()))
-	schedule := &Schedule{
+func randomSchedule(seed int64) Schedule {
+	rand.Seed(seed)
+	schedule := Schedule{
 		Blocked: rand.Float32() > 0.5,
 		Name:    "Random Room",
 		Date:    time.Now().Format("2006-01-02"),
@@ -189,7 +211,7 @@ func randomSchedule() *Schedule {
 	return schedule
 }
 
-func drawClock(schedule *Schedule, w http.ResponseWriter) {
+func drawClock(schedule Schedule, w io.Writer) error {
 	dest := image.NewRGBA(image.Rect(0, 0, width, height))
 	gc := draw2dimg.NewGraphicContext(dest)
 	draw2dkit.Rectangle(gc, 0, 0, fwidth, fheight)
@@ -199,8 +221,8 @@ func drawClock(schedule *Schedule, w http.ResponseWriter) {
 	gc.SetFillColor(black)
 	gc.SetStrokeColor(black)
 	gc.SetLineWidth(5)
-	gc.FontCache.Store(draw2d.FontData{Name: "roboto"}, getFont("Regular"))
-	gc.FontCache.Store(draw2d.FontData{Name: "roboto-bold"}, getFont("Bold"))
+	gc.FontCache.Store(draw2d.FontData{Name: "roboto"}, regular)
+	gc.FontCache.Store(draw2d.FontData{Name: "roboto-bold"}, bold)
 	gc.SetFontData(draw2d.FontData{Name: "roboto-bold"})
 	// Clock
 	gc.SetFontSize(30)
@@ -210,10 +232,10 @@ func drawClock(schedule *Schedule, w http.ResponseWriter) {
 	drawQuarters(gc, schedule)
 
 	// Save to file
-	bmp.Encode(w, dest)
+	return bmp.Encode(w, dest)
 }
 
-func drawQuarters(gc *draw2dimg.GraphicContext, schedule *Schedule) {
+func drawQuarters(gc *draw2dimg.GraphicContext, schedule Schedule) {
 
 	lines := len(schedule.BlockInfos)
 	startHeight, heightLine := 100.0, 50.0
@@ -289,5 +311,19 @@ func main() {
 		port = "8080"
 	}
 
-	log.Fatal(http.ListenAndServe(addr+":"+port, nil))
+	server := &http.Server{Addr: addr + ":" + port, Handler: nil}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	go func() {
+		log.Println("Listening on " + addr + ":" + port)
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	<-stop
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	server.Shutdown(ctx)
+	log.Println("Server gracefully stopped")
 }
